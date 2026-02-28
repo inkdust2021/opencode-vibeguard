@@ -9,6 +9,8 @@ English | [中文](README-zh.md)
 
 Inspired by [VibeGuard](https://github.com/inkdust2021/VibeGuard).
 
+![Screenshot](./screenshot.png)
+
 An OpenCode plugin that:
 
 - Replaces configured sensitive strings with placeholders **before requests are sent to the LLM provider** (the provider never sees plaintext)

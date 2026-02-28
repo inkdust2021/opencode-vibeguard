@@ -9,6 +9,8 @@
 
 灵感来源：[VibeGuard](https://github.com/inkdust2021/VibeGuard)。
 
+![截图](./screenshot.png)
+
 一个 OpenCode 插件：
 
 - 在 **发送给 LLM 提供商之前**，将匹配到的敏感内容替换为占位符（上游永远看不到明文）
