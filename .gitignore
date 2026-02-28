@@ -1,0 +1,14 @@
+node_modules/
+.DS_Store
+*.log
+*.tgz
+
+# 本地配置/敏感信息（不要提交）
+vibeguard.config.json
+.env
+.env.*
+.opencode/
+
+# 测试与本地临时文件（按需保留在本地，不提交）
+test/
+coverage/
