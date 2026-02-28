@@ -7,6 +7,8 @@
 
 # opencode-vibeguard
 
+灵感来源：[VibeGuard](https://github.com/inkdust2021/VibeGuard)。
+
 一个 OpenCode 插件：
 
 - 在 **发送给 LLM 提供商之前**，将匹配到的敏感内容替换为占位符（上游永远看不到明文）
@@ -39,12 +41,21 @@
 
 ## 安装/使用（npm）
 
-发布到 npm 后，可直接在 `opencode.json` 中引用包名：
+在 `opencode.json` 中引用包名（首次使用时 OpenCode 会自动安装插件）：
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-vibeguard"]
+}
+```
+
+也可以锁定版本：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-vibeguard@0.1.0"]
 }
 ```
 

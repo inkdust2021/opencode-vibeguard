@@ -7,6 +7,8 @@ English | [中文](README-zh.md)
 
 # opencode-vibeguard
 
+Inspired by [VibeGuard](https://github.com/inkdust2021/VibeGuard).
+
 An OpenCode plugin that:
 
 - Replaces configured sensitive strings with placeholders **before requests are sent to the LLM provider** (the provider never sees plaintext)
@@ -39,12 +41,21 @@ Placeholder format (aligned with VibeGuard):
 
 ## Install / Use (npm)
 
-After publishing to npm, reference the package name in `opencode.json`:
+Reference the package name in `opencode.json` (OpenCode will auto-install it on first use):
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-vibeguard"]
+}
+```
+
+You can also pin a version:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-vibeguard@0.1.0"]
 }
 ```
 
