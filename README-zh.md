@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
 [![downloads](https://img.shields.io/npm/dm/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
-[![license](https://img.shields.io/npm/l/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
+[![license](https://img.shields.io/github/license/inkdust2021/opencode-vibeguard)](LICENSE)
 [![node](https://img.shields.io/node/v/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
 
 # opencode-vibeguard
@@ -56,6 +56,23 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-vibeguard@0.1.0"]
+}
+```
+
+可选：用 npm/pnpm/bun 手动安装（离线/可复现环境更方便）：
+
+```bash
+npm i -D opencode-vibeguard
+# 或：pnpm add -D opencode-vibeguard
+# 或：bun add -d opencode-vibeguard
+```
+
+如果你希望直接从项目本地的 `node_modules` 加载，可用 `file://` 路径：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file://./node_modules/opencode-vibeguard/src/index.js"]
 }
 ```
 

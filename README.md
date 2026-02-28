@@ -2,7 +2,7 @@ English | [中文](README-zh.md)
 
 [![npm](https://img.shields.io/npm/v/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
 [![downloads](https://img.shields.io/npm/dm/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
-[![license](https://img.shields.io/npm/l/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
+[![license](https://img.shields.io/github/license/inkdust2021/opencode-vibeguard)](LICENSE)
 [![node](https://img.shields.io/node/v/opencode-vibeguard)](https://www.npmjs.com/package/opencode-vibeguard)
 
 # opencode-vibeguard
@@ -56,6 +56,23 @@ You can also pin a version:
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": ["opencode-vibeguard@0.1.0"]
+}
+```
+
+Optional (manual) install via npm/pnpm/bun (useful for offline / reproducible setups):
+
+```bash
+npm i -D opencode-vibeguard
+# or: pnpm add -D opencode-vibeguard
+# or: bun add -d opencode-vibeguard
+```
+
+If you prefer to load from your local `node_modules`, use a `file://` plugin path:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file://./node_modules/opencode-vibeguard/src/index.js"]
 }
 ```
 
