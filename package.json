@@ -7,12 +7,19 @@
   "exports": "./src/index.js",
   "files": [
     "src",
+    "scripts",
     "README-zh.md",
     "vibeguard.config.json.example"
   ],
   "scripts": {
+    "pretest": "node scripts/generate-test-secrets.js",
     "test": "node --test",
-    "prepack": "npm test"
+    "prepack": "npm test",
+    "postinstall": "node scripts/download-model.js",
+    "download-model": "node scripts/download-model.js"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^4.2.0"
   },
   "keywords": [
     "opencode",
@@ -21,7 +28,9 @@
     "privacy",
     "redaction",
     "secrets",
-    "pii"
+    "pii",
+    "privacy-filter",
+    "ai"
   ],
   "repository": {
     "type": "git",
@@ -31,5 +40,8 @@
     "url": "https://github.com/inkdust2021/opencode-vibeguard/issues"
   },
   "homepage": "https://github.com/inkdust2021/opencode-vibeguard#readme",
-  "license": "MIT"
+  "license": "MIT",
+  "bin": {
+    "vibeguard-server": "src/model-server.js"
+  }
 }

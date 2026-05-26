@@ -1,42 +1,100 @@
 import { loadConfig } from "./config.js"
 import { buildPatternSet } from "./patterns.js"
 import { PlaceholderSession } from "./session.js"
-import { redactText } from "./engine.js"
+import { redactText, redactTextWithAI } from "./engine.js"
 import { redactDeep, restoreDeep } from "./deep.js"
 import { restoreText } from "./restore.js"
 
 /**
- * OpenCode 插件入口：
- * - `experimental.chat.messages.transform`：LLM 请求前对全部消息做脱敏（保证 provider 永远看不到真实值）
- * - `tool.execute.before`：工具执行前还原占位符（保证本机执行拿到真实值）
+ * OpenCode plugin entry point:
+ * - `experimental.chat.messages.transform`: redact all messages before sending to LLM
+ * - `tool.execute.before`: restore placeholders before local tool execution
+ * - `experimental.text.complete`: restore placeholders in completed model output
  *
- * 说明：为了降低误用风险，本插件在“找不到配置文件或 enabled=false”时为 no-op。
+ * AI detection is opt-in via the `ai` config section. When AI is enabled but
+ * @huggingface/transformers is not installed, falls back to regex/keyword only.
  */
 export const VibeGuardPrivacy = async (ctx) => {
   const config = await loadConfig(ctx.directory)
   const debug = Boolean(process.env.OPENCODE_VIBEGUARD_DEBUG) || Boolean(config.debug)
 
+  // Use OpenCode's structured logging instead of console.log to avoid
+  // corrupting the TUI. Falls back to no-op if client.app.log is unavailable.
+  const log = (level, message, extra) => {
+    try {
+      ctx.client?.app?.log({
+        body: { service: "vibeguard", level, message, ...(extra ? { extra } : {}) },
+      })
+    } catch {
+      /* swallow — never crash the plugin over logging */
+    }
+  }
+
   if (debug) {
-    const from = config.loadedFrom ? config.loadedFrom : "未找到（插件将 no-op）"
-    console.log(`[opencode-vibeguard] 配置：${from} enabled=${config.enabled}`)
+    const from = config.loadedFrom ? config.loadedFrom : "not found (plugin will no-op)"
+    log("debug", `Config: ${from} enabled=${config.enabled}`)
   }
 
   if (!config.enabled) return {}
 
   const patterns = buildPatternSet(config.patterns)
   const sessions = new Map()
+  const sessionLastAccess = new Map() // track last access time for pruning
+  const MAX_SESSIONS = 50 // prune oldest when exceeded
+  const aiConfig = config.ai
+  const useAI = aiConfig.enabled
+
+  // Check AI availability at startup (non-blocking info)
+  // Import ai-detect lazily to avoid pulling in Transformers.js when AI disabled
+  if (useAI) {
+    const { isAIAvailable, setLogger } = await import("./ai-detect.js")
+    setLogger(log)
+    const available = await isAIAvailable()
+    if (available) {
+      log("info", `AI detection enabled (model: ${aiConfig.model}, dtype: ${aiConfig.dtype}). Model will be downloaded on first use if not cached.`)
+    } else {
+      log("warn", "AI detection enabled in config but @huggingface/transformers is not installed. Falling back to regex/keyword detection only.")
+    }
+    // NOTE: We intentionally do NOT register process exit handlers for disposeAI().
+    // The ONNX runtime (native N-API addon) crashes if dispose() is called during
+    // process teardown. The OS reclaims all memory on exit anyway.
+  }
+
+  if (debug) {
+    log("debug", `AI detection: ${useAI ? "enabled" : "disabled (opt-in via config)"}`)
+    log("debug", `Regex patterns: ${patterns.keywords.length} keywords, ${patterns.regex.length} regex rules`)
+  }
 
   const getSession = (sessionID) => {
     const key = String(sessionID ?? "")
     if (!key) return null
     const existing = sessions.get(key)
-    if (existing) return existing
+    if (existing) {
+      sessionLastAccess.set(key, Date.now())
+      return existing
+    }
+    // Prune oldest sessions if map is too large
+    if (sessions.size >= MAX_SESSIONS) {
+      let oldestKey = null
+      let oldestTime = Infinity
+      for (const [k, t] of sessionLastAccess) {
+        if (t < oldestTime) {
+          oldestTime = t
+          oldestKey = k
+        }
+      }
+      if (oldestKey) {
+        sessions.delete(oldestKey)
+        sessionLastAccess.delete(oldestKey)
+      }
+    }
     const created = new PlaceholderSession({
       prefix: config.prefix,
       ttlMs: config.ttlMs,
       maxMappings: config.maxMappings,
     })
     sessions.set(key, created)
+    sessionLastAccess.set(key, Date.now())
     return created
   }
 
@@ -53,60 +111,71 @@ export const VibeGuardPrivacy = async (ctx) => {
 
       let changedTextParts = 0
 
+      // Choose redaction function based on AI config
+      const redactStr = useAI
+        ? async (text) => {
+            const result = await redactTextWithAI(text, patterns, session, aiConfig, debug)
+            return result.text
+          }
+        : (text) => {
+            return Promise.resolve(redactText(text, patterns, session).text)
+          }
+
       for (const msg of msgs) {
         const parts = Array.isArray(msg?.parts) ? msg.parts : []
         for (const part of parts) {
           if (!part) continue
 
-          // 普通文本（用户/助手）
+          // Plain text (user/assistant)
           if (part.type === "text") {
             if (part.ignored) continue
             if (!part.text || typeof part.text !== "string") continue
             const before = part.text
-            const after = redactText(before, patterns, session).text
+            const after = await redactStr(before)
             if (after !== before) changedTextParts++
             part.text = after
             continue
           }
 
-          // 推理文本（部分模型/配置会进入 prompt）
+          // Reasoning text
           if (part.type === "reasoning") {
             if (!part.text || typeof part.text !== "string") continue
             const before = part.text
-            const after = redactText(before, patterns, session).text
+            const after = await redactStr(before)
             if (after !== before) changedTextParts++
             part.text = after
             continue
           }
 
-          // 工具调用/输出：最常见的泄漏来源（例如读取 .env）
+          // Tool calls/outputs: most common leak source (e.g., reading .env)
           if (part.type === "tool") {
             const state = part.state
             if (!state || typeof state !== "object") continue
 
-            // 统一把工具输入也做深度脱敏：真实执行的 args 会包含明文（由 tool.execute.before 还原），
-            // 如果不在这里再脱敏一次，后续回合会把明文 args 带给 LLM。
+            // Deep-redact tool inputs (args) so they don't leak in later turns.
+            // Uses sync regex-only for deep object traversal; AI layer covers
+            // text parts and tool output strings.
             if (state.input && typeof state.input === "object") {
               redactDeep(state.input, patterns, session)
             }
 
             if (state.status === "completed" && typeof state.output === "string") {
               const before = state.output
-              const after = redactText(before, patterns, session).text
+              const after = await redactStr(before)
               if (after !== before) changedTextParts++
               state.output = after
               continue
             }
             if (state.status === "error" && typeof state.error === "string") {
               const before = state.error
-              const after = redactText(before, patterns, session).text
+              const after = await redactStr(before)
               if (after !== before) changedTextParts++
               state.error = after
               continue
             }
             if (state.status === "pending" && typeof state.raw === "string") {
               const before = state.raw
-              const after = redactText(before, patterns, session).text
+              const after = await redactStr(before)
               if (after !== before) changedTextParts++
               state.raw = after
               continue
@@ -116,7 +185,7 @@ export const VibeGuardPrivacy = async (ctx) => {
       }
 
       if (debug && changedTextParts > 0) {
-        console.log(`[opencode-vibeguard] 本次请求前脱敏：已修改 ${changedTextParts} 处文本片段`)
+        log("debug", `Pre-request redaction: modified ${changedTextParts} text segment(s)`)
       }
     },
 
@@ -130,7 +199,7 @@ export const VibeGuardPrivacy = async (ctx) => {
       const after = restoreText(before, session)
       output.text = after
       if (debug && after !== before) {
-        console.log("[opencode-vibeguard] 本次响应完成后还原：已修改 1 处文本片段")
+        log("debug", "Post-response restore: modified 1 text segment")
       }
     },
 

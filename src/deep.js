@@ -27,7 +27,7 @@ export function restoreDeep(value, session) {
       for (let i = 0; i < node.length; i++) {
         const v = node[i]
         if (typeof v === "string") node[i] = restoreText(v, session)
-        if (v && typeof v === "object") walk(v)
+        else if (v && typeof v === "object") walk(v)
       }
       return
     }
@@ -37,7 +37,7 @@ export function restoreDeep(value, session) {
     for (const key of Object.keys(node)) {
       const v = node[key]
       if (typeof v === "string") node[key] = restoreText(v, session)
-      if (v && typeof v === "object") walk(v)
+      else if (v && typeof v === "object") walk(v)
     }
   }
 
@@ -64,7 +64,7 @@ export function redactDeep(value, patterns, session) {
       for (let i = 0; i < node.length; i++) {
         const v = node[i]
         if (typeof v === "string") node[i] = redactText(v, patterns, session).text
-        if (v && typeof v === "object") walk(v)
+        else if (v && typeof v === "object") walk(v)
       }
       return
     }
@@ -74,7 +74,7 @@ export function redactDeep(value, patterns, session) {
     for (const key of Object.keys(node)) {
       const v = node[key]
       if (typeof v === "string") node[key] = redactText(v, patterns, session).text
-      if (v && typeof v === "object") walk(v)
+      else if (v && typeof v === "object") walk(v)
     }
   }
 

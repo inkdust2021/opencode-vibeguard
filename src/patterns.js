@@ -1,11 +1,4 @@
-function sanitizeCategory(input) {
-  const raw = String(input ?? "").trim()
-  if (!raw) return "TEXT"
-  const upper = raw.toUpperCase()
-  const safe = upper.replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_")
-  if (!safe) return "TEXT"
-  return safe
-}
+import { sanitizeCategory } from "./util.js"
 
 /**
  * 将 Go 风格的 `(?i)` / `(?m)` 前缀做一个轻量兼容（仅处理“开头连续出现”的情况）。
@@ -34,8 +27,8 @@ function peelInlineFlags(pattern, flags) {
 }
 
 /**
- * 内置规则：从 VibeGuard 的 builtin 规则移植（做了 JS 兼容调整）。
- * 目标是“低配置成本 + 尽量覆盖”，不追求 100% 精准。
+ * Builtin detection rules (ported from VibeGuard with JS compatibility).
+ * Goal: low config cost + broad coverage, not 100% precision.
  */
 const BUILTIN = new Map([
   [
@@ -49,7 +42,6 @@ const BUILTIN = new Map([
   [
     "china_phone",
     {
-      // 直接匹配手机号本体（用 lookaround 替代 Go 里的捕获组边界保留写法）
       pattern: String.raw`(?<!\d)1[3-9]\d{9}(?!\d)`,
       flags: "",
       category: "CHINA_PHONE",
@@ -74,7 +66,6 @@ const BUILTIN = new Map([
   [
     "ipv4",
     {
-      // 不校验每段 0-255；目标是覆盖常见情况
       pattern: String.raw`(?:\d{1,3}\.){3}\d{1,3}`,
       flags: "",
       category: "IPV4",
@@ -86,6 +77,134 @@ const BUILTIN = new Map([
       pattern: String.raw`(?:[0-9a-f]{2}:){5}[0-9a-f]{2}`,
       flags: "i",
       category: "MAC",
+    },
+  ],
+  // --- Additional builtins ---
+  [
+    "phone_us",
+    {
+      // US phone: (555) 123-4567, 555-123-4567, +1-555-123-4567
+      // Requires at least one separator or parenthesized area code to avoid matching bare digit sequences
+      pattern: String.raw`(?<!\d)(?:\+?1[-.\s])?\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)|(?<!\d)(?:\+?1[-.\s])?\d{3}[-.\s]\d{3}[-.\s]?\d{4}(?!\d)`,
+      flags: "",
+      category: "PHONE_US",
+    },
+  ],
+  [
+    "phone_intl",
+    {
+      // International: +44 20 7946 0958, +49-30-1234567, +33 1 23 45 67 89
+      // Requires + prefix, country code 1-3 digits, then 7-14 additional digits with separators
+      // Must contain at least one separator to avoid matching arbitrary digit strings
+      pattern: String.raw`(?<!\d)\+[1-9]\d{0,2}[-.\s]\d(?:[-.\s]?\d){6,13}(?!\d)`,
+      flags: "",
+      category: "PHONE_INTL",
+    },
+  ],
+  [
+    "ssn",
+    {
+      // US Social Security Number: 123-45-6789
+      pattern: String.raw`(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)`,
+      flags: "",
+      category: "SSN",
+    },
+  ],
+  [
+    "credit_card",
+    {
+      // Visa (4xxx), MC (51-55xx), Discover (6011/65xx): 16 digits with optional separators
+      // Amex (34xx/37xx): 15 digits (4-6-5 grouping)
+      pattern: String.raw`(?<!\d)(?:(?:4\d{3}|5[1-5]\d{2}|6(?:011|5\d{2}))[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}|3[47]\d{2}[-\s]?\d{6}[-\s]?\d{5})(?!\d)`,
+      flags: "",
+      category: "CREDIT_CARD",
+    },
+  ],
+  [
+    "openai_key",
+    {
+      // OpenAI API keys: legacy sk-...T3BlbkFJ... and new sk-proj-... formats
+      pattern: String.raw`sk-(?:proj-)?[A-Za-z0-9_-]{20,}`,
+      flags: "",
+      category: "OPENAI_KEY",
+    },
+  ],
+  [
+    "github_token",
+    {
+      pattern: String.raw`(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}`,
+      flags: "",
+      category: "GITHUB_TOKEN",
+    },
+  ],
+  [
+    "aws_access_key",
+    {
+      pattern: String.raw`AKIA[0-9A-Z]{16}`,
+      flags: "",
+      category: "AWS_ACCESS_KEY",
+    },
+  ],
+  [
+    "vault_token",
+    {
+      // HashiCorp Vault tokens: hvs.xxxxx or s.xxxxx
+      pattern: String.raw`(?:hvs|s)\.[A-Za-z0-9]{24,}`,
+      flags: "",
+      category: "VAULT_TOKEN",
+    },
+  ],
+  [
+    "private_key_header",
+    {
+      pattern: String.raw`-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----`,
+      flags: "",
+      category: "PRIVATE_KEY",
+    },
+  ],
+  [
+    "generic_bearer",
+    {
+      // Bearer tokens in Authorization headers
+      pattern: String.raw`Bearer\s+[A-Za-z0-9\-._~+/]+=*`,
+      flags: "i",
+      category: "BEARER_TOKEN",
+    },
+  ],
+  [
+    "npm_token",
+    {
+      // npm access tokens: npm_XXXXXXXXXXXXXXXXXXXX (36+ alphanumeric)
+      pattern: String.raw`npm_[A-Za-z0-9]{36,}`,
+      flags: "",
+      category: "NPM_TOKEN",
+    },
+  ],
+  [
+    "stripe_key",
+    {
+      // Stripe secret/publishable keys: sk_live_*, pk_live_*, sk_test_*, pk_test_*
+      pattern: String.raw`[sp]k_(?:live|test)_[A-Za-z0-9]{20,}`,
+      flags: "",
+      category: "STRIPE_KEY",
+    },
+  ],
+  [
+    "slack_webhook",
+    {
+      // Slack incoming webhook URLs
+      pattern: String.raw`https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+`,
+      flags: "",
+      category: "SLACK_WEBHOOK",
+    },
+  ],
+  [
+    "slack_token",
+    {
+      // Slack bot/user tokens: xoxb-*, xoxp-*, xoxs-*
+      pattern: String.raw`xox[bps]-[0-9]+-[A-Za-z0-9-]+`,
+      flags: "",
+      category: "SLACK_TOKEN",
     },
   ],
 ])
@@ -117,7 +236,13 @@ export function buildPatternSet(patterns) {
     const category = sanitizeCategory(x.category)
     const flags = typeof x.flags === "string" ? x.flags : ""
     const peeled = peelInlineFlags(pattern, flags)
-    regexRules.push({ pattern: peeled.pattern, flags: peeled.flags, category })
+    const globalFlags = peeled.flags.includes("g") ? peeled.flags : `${peeled.flags}g`
+    regexRules.push({
+      pattern: peeled.pattern,
+      flags: peeled.flags,
+      category,
+      compiled: new RegExp(peeled.pattern, globalFlags),
+    })
   }
 
   for (const name of builtin) {
@@ -125,7 +250,13 @@ export function buildPatternSet(patterns) {
     if (!key) continue
     const rule = BUILTIN.get(key)
     if (!rule) continue
-    regexRules.push({ pattern: rule.pattern, flags: rule.flags, category: rule.category })
+    const globalFlags = rule.flags.includes("g") ? rule.flags : `${rule.flags}g`
+    regexRules.push({
+      pattern: rule.pattern,
+      flags: rule.flags,
+      category: rule.category,
+      compiled: new RegExp(rule.pattern, globalFlags),
+    })
   }
 
   const excludeSet = new Set(exclude.map((x) => String(x ?? "")))

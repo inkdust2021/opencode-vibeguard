@@ -19,3 +19,25 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+SUPPLEMENTARY NOTICE — REDACTION DISCLAIMER
+
+This software attempts to detect and redact personally identifiable information
+(PII), secrets, and other sensitive data before it is sent to a language model.
+However, NO REDACTION SYSTEM IS PERFECT. The authors and contributors make NO
+guarantee, representation, or warranty — express or implied — that all
+sensitive data will be detected or redacted.
+
+The authors and contributors SHALL NOT BE LIABLE for any sensitive data,
+secrets, credentials, personally identifiable information, or other
+confidential material that passes through this software unredacted, whether due
+to limitations of regex patterns, AI model accuracy, misconfiguration, software
+defects, or any other cause.
+
+YOU ARE SOLELY RESPONSIBLE for reviewing your configuration, testing redaction
+coverage against your specific data, and implementing additional safeguards as
+appropriate for your use case. This software is provided as one layer in a
+defense-in-depth strategy and must not be relied upon as the sole mechanism for
+preventing data exposure.

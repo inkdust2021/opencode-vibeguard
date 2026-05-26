@@ -1,13 +1,5 @@
 import { createHmac, randomBytes } from "node:crypto"
-
-function sanitizeCategory(input) {
-  const raw = String(input ?? "").trim()
-  if (!raw) return "TEXT"
-  const upper = raw.toUpperCase()
-  const safe = upper.replace(/[^A-Z0-9_]/g, "_").replace(/_+/g, "_")
-  if (!safe) return "TEXT"
-  return safe
-}
+import { sanitizeCategory } from "./util.js"
 
 function toHexLower(buffer) {
   return Buffer.from(buffer).toString("hex")
@@ -121,7 +113,7 @@ export class PlaceholderSession {
 
     // 极低概率：hash12 冲突。追加 _N 后缀保证唯一性（与 VibeGuard 一致的策略）。
     const withoutSuffix = base.slice(0, -2) // 去掉末尾 "__"
-    for (let i = 2; ; i++) {
+    for (let i = 2; i < 1000; i++) {
       const candidate = `${withoutSuffix}_${i}__`
       const prev = this.forward.get(candidate)
       if (prev === undefined) {
@@ -136,11 +128,13 @@ export class PlaceholderSession {
         return candidate
       }
     }
+    throw new Error(`vibeguard: placeholder collision limit exceeded for category "${category}"`)
+
   }
 }
 
 export function getPlaceholderRegex(prefix) {
   const escaped = String(prefix).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   // Pattern: __VG_CATEGORY_HASH12__ or __VG_CATEGORY_HASH12_N__
-  return new RegExp(`${escaped}[A-Za-z0-9_]+_[a-f0-9A-F]{12}(?:_\\d+)?__`, "g")
+  return new RegExp(`${escaped}[A-Za-z0-9_]+_[a-f0-9]{12}(?:_\\d+)?__`, "g")
 }

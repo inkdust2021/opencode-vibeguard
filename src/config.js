@@ -30,6 +30,27 @@ function readJson(filepath) {
     .catch(() => null)
 }
 
+/**
+ * Normalize the opt-in AI detection config.
+ * All fields have safe defaults; AI is disabled unless explicitly enabled.
+ */
+function normalizeAiConfig(raw) {
+  const ai = raw && typeof raw === "object" ? raw : {}
+  return {
+    enabled: Boolean(ai.enabled),
+    // Model to use for token classification (default: openai/privacy-filter)
+    model: typeof ai.model === "string" ? ai.model : "openai/privacy-filter",
+    // Quantization dtype (default: q4 ~400MB; alternatives: fp32, fp16, q8)
+    dtype: typeof ai.dtype === "string" ? ai.dtype : "q4",
+    // Inference device (default: cpu; alternative: webgpu if available)
+    device: typeof ai.device === "string" ? ai.device : "cpu",
+    // Which Privacy Filter categories to use. Empty = all.
+    categories: Array.isArray(ai.categories) ? ai.categories.map((c) => String(c)) : [],
+    // If true, fall back silently to regex-only when AI is unavailable.
+    silentFallback: ai.silentFallback !== false,
+  }
+}
+
 function normalizeConfig(raw) {
   const cfg = raw && typeof raw === "object" ? raw : {}
 
@@ -44,6 +65,8 @@ function normalizeConfig(raw) {
 
   const patterns = cfg.patterns && typeof cfg.patterns === "object" ? cfg.patterns : {}
 
+  const ai = normalizeAiConfig(cfg.ai)
+
   return {
     enabled,
     debug,
@@ -51,6 +74,7 @@ function normalizeConfig(raw) {
     ttlMs,
     maxMappings,
     patterns,
+    ai,
   }
 }
 

@@ -17,5 +17,13 @@
     ],
     "builtin": ["email", "china_phone", "china_id", "uuid", "ipv4", "mac"],
     "exclude": ["example.com", "localhost", "127.0.0.1", "0.0.0.0"]
+  },
+  "ai": {
+    "enabled": false,
+    "model": "openai/privacy-filter",
+    "dtype": "q4",
+    "device": "cpu",
+    "categories": [],
+    "silentFallback": true
   }
 }
