@@ -1,3 +1,5 @@
+import { peelInlineFlags } from "./patterns.js"
+
 function subtractCovered(start, end, covered) {
   if (start >= end) return []
   const out = []
@@ -72,13 +74,18 @@ export function redactText(input, patterns, session) {
 
   for (const rule of patterns.regex) {
     const baseFlags = String(rule.flags ?? "")
-    const flags = baseFlags.includes("g") ? baseFlags : `${baseFlags}g`
-    const re = new RegExp(rule.pattern, flags)
+    const peeled = peelInlineFlags(rule.pattern, baseFlags)
+    const flags = peeled.flags.includes("g") ? peeled.flags : `${peeled.flags}g`
+    const re = new RegExp(peeled.pattern, flags)
     for (const m of text.matchAll(re)) {
       if (!m[0]) continue
-      const start = m.index ?? -1
-      if (start < 0) continue
-      const end = start + m[0].length
+      // Support capture groups: if pattern has groups, use last group as the value to replace
+      const hasGroups = m.length > 1 && m[m.length - 1] !== undefined
+      const matchText = hasGroups ? m[m.length - 1] : m[0]
+      const matchIndex = hasGroups ? (m.index ?? -1) + m[0].indexOf(matchText) : (m.index ?? -1)
+      if (matchIndex < 0) continue
+      const start = matchIndex
+      const end = start + matchText.length
       const original = text.slice(start, end)
       if (patterns.exclude.has(original)) continue
       found.push({ start, end, original, category: rule.category })

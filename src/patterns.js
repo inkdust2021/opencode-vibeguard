@@ -12,7 +12,7 @@ function sanitizeCategory(input) {
  * @param {string} pattern
  * @param {string} flags
  */
-function peelInlineFlags(pattern, flags) {
+export function peelInlineFlags(pattern, flags) {
   let p = String(pattern ?? "")
   let f = String(flags ?? "")
 
