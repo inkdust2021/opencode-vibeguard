@@ -87,14 +87,22 @@ export const VibeGuardPrivacy = async (ctx) => {
             // 统一把工具输入也做深度脱敏：真实执行的 args 会包含明文（由 tool.execute.before 还原），
             // 如果不在这里再脱敏一次，后续回合会把明文 args 带给 LLM。
             if (state.input && typeof state.input === "object") {
-              redactDeep(state.input, patterns, session)
+              const redacted = redactDeep(state.input, patterns, session)
+              state.input = redacted.value
+              if (redacted.matches > 0) changedTextParts++
             }
 
-            if (state.status === "completed" && typeof state.output === "string") {
-              const before = state.output
-              const after = redactText(before, patterns, session).text
-              if (after !== before) changedTextParts++
-              state.output = after
+            if (state.status === "completed") {
+              if (typeof state.output === "string") {
+                const before = state.output
+                const after = redactText(before, patterns, session).text
+                if (after !== before) changedTextParts++
+                state.output = after
+              } else if (state.output && typeof state.output === "object") {
+                const redacted = redactDeep(state.output, patterns, session)
+                state.output = redacted.value
+                if (redacted.matches > 0) changedTextParts++
+              }
               continue
             }
             if (state.status === "error" && typeof state.error === "string") {

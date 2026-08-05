@@ -5,6 +5,9 @@
   "type": "module",
   "main": "./src/index.js",
   "exports": "./src/index.js",
+  "dependencies": {
+    "flare-redact": "^1.4.1"
+  },
   "files": [
     "src",
     "README-zh.md",

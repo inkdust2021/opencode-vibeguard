@@ -16,6 +16,7 @@ An OpenCode plugin that:
 - Replaces configured sensitive strings with placeholders **before requests are sent to the LLM provider** (the provider never sees plaintext)
 - Restores placeholders back to the original text **after the model output completes** (more natural local display/persistence)
 - Restores placeholders **before tool execution** (e.g. `bash` / `write` / `edit`) so local tools run with real values
+- Recursively redacts structured MCP/tool input and output with [Flare Redact](https://github.com/flare-collection/flare-redact), including nested arrays and objects
 
 Note: OpenCode tool calls are stored in the DB with the **real executed args/output**. Before each request, this plugin also redacts **historical tool inputs/outputs** to prevent plaintext from being sent upstream in later turns.
 
@@ -113,3 +114,4 @@ Or set in `vibeguard.config.json`:
 ## Known limitations
 
 - During streaming (`text-delta`) the placeholder may briefly appear; it will be restored at `text-end`.
+- OpenCode does not currently expose a `session.share` transform hook. Treat shared-session exports as potentially sensitive and review them before publishing.

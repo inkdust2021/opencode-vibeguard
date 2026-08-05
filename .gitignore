@@ -9,6 +9,5 @@ vibeguard.config.json
 .env.*
 .opencode/
 
-# 测试与本地临时文件（按需保留在本地，不提交）
-test/
+# 测试输出与本地临时文件
 coverage/
