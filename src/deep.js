@@ -1,78 +1,5 @@
-import { compilePolicy } from "flare-redact"
-
 import { restoreText } from "./restore.js"
-
-const deepRedactors = new WeakMap()
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function buildDetectors(patterns) {
-  const detectors = []
-  const categories = new Map()
-
-  for (const [index, rule] of patterns.keywords.entries()) {
-    const id = `vibeguard_keyword_${index}`
-    detectors.push({
-      id,
-      label: rule.category,
-      why: "Configured VibeGuard keyword.",
-      pattern: new RegExp(escapeRegExp(rule.value), "g"),
-      default: false,
-      risk: "critical",
-    })
-    categories.set(id, rule.category)
-  }
-
-  for (const [index, rule] of patterns.regex.entries()) {
-    const id = `vibeguard_regex_${index}`
-    detectors.push({
-      id,
-      label: rule.category,
-      why: "Configured VibeGuard regular expression.",
-      pattern: new RegExp(rule.pattern, rule.flags),
-      default: false,
-      risk: "critical",
-    })
-    categories.set(id, rule.category)
-  }
-
-  return { detectors, categories }
-}
-
-function getDeepRedactor(patterns, session) {
-  const cached = deepRedactors.get(session)
-  if (cached) return cached
-
-  const { detectors, categories } = buildDetectors(patterns)
-  if (detectors.length === 0) {
-    const noop = (value) => ({ value, matches: 0 })
-    deepRedactors.set(session, noop)
-    return noop
-  }
-
-  let matches = 0
-  const policy = compilePolicy({
-    custom: detectors,
-    only: detectors.map((detector) => detector.id),
-    allow: [...patterns.exclude],
-    redactKeys: false,
-    mask: ({ value, detector }) => {
-      matches++
-      return session.getOrCreatePlaceholder(value, categories.get(detector.id))
-    },
-  })
-
-  const redact = (value) => {
-    matches = 0
-    const redacted = policy.redact(value)
-    return { value: redacted, matches }
-  }
-
-  deepRedactors.set(session, redact)
-  return redact
-}
+import { redactText } from "./engine.js"
 
 function isPlainObject(value) {
   if (!value || typeof value !== "object") return false
@@ -119,11 +46,43 @@ export function restoreDeep(value, session) {
 
 /**
  * 深度遍历结构化值，把所有字符串中的敏感内容替换为占位符。
- * Flare Redact 返回保持原型/共享引用/循环引用的安全副本，原值不被修改。
+ * 只复制 Array / PlainObject，保持共享引用和循环引用，原值不被修改。
  * @param {unknown} value
  * @param {{ keywords: Array<{value:string,category:string}>, regex: Array<{pattern:string,flags:string,category:string}>, exclude: Set<string> }} patterns
  * @param {{ getOrCreatePlaceholder(original: string, category: string): string }} session
  */
 export function redactDeep(value, patterns, session) {
-  return getDeepRedactor(patterns, session)(value)
+  const seen = new WeakMap()
+  let matches = 0
+
+  const walk = (node) => {
+    if (typeof node === "string") {
+      const redacted = redactText(node, patterns, session)
+      matches += redacted.matches.length
+      return redacted.text
+    }
+
+    if (!node || typeof node !== "object") return node
+
+    const cached = seen.get(node)
+    if (cached) return cached
+
+    if (Array.isArray(node)) {
+      const out = new Array(node.length)
+      seen.set(node, out)
+      for (let i = 0; i < node.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(node, i)) out[i] = walk(node[i])
+      }
+      return out
+    }
+
+    if (!isPlainObject(node)) return node
+
+    const out = Object.create(Object.getPrototypeOf(node))
+    seen.set(node, out)
+    for (const key of Object.keys(node)) out[key] = walk(node[key])
+    return out
+  }
+
+  return { value: walk(value), matches }
 }

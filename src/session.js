@@ -142,5 +142,5 @@ export class PlaceholderSession {
 export function getPlaceholderRegex(prefix) {
   const escaped = String(prefix).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
   // Pattern: __VG_CATEGORY_HASH12__ or __VG_CATEGORY_HASH12_N__
-  return new RegExp(`${escaped}[A-Za-z0-9_]+_[a-f0-9A-F]{12}(?:_\\d+)?__`, "g")
+  return new RegExp(`${escaped}[A-Za-z0-9_]+?_[a-f0-9A-F]{12}(?:_\\d+)?__`, "g")
 }

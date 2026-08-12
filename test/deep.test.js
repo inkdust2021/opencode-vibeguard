@@ -42,3 +42,43 @@ test("preserves shared and circular references", () => {
   assert.equal(redacted.self, redacted)
   assert.match(redacted.first.token, /^__VG_TOKEN_[0-9a-f]{12}__$/)
 })
+
+test("uses the same overlap behavior as text redaction", () => {
+  const session = new PlaceholderSession({ secret: new Uint8Array(32).fill(5) })
+  const patternsWithOverlap = {
+    keywords: [
+      { value: "abcd", category: "FIRST" },
+      { value: "cdef", category: "SECOND" },
+    ],
+    regex: [],
+    exclude: new Set(),
+  }
+
+  const redacted = redactDeep({ value: "abcdef" }, patternsWithOverlap, session).value
+
+  assert.match(redacted.value, /^__VG_FIRST_[0-9a-f]{12}____VG_SECOND_[0-9a-f]{12}__$/)
+  restoreDeep(redacted, session)
+  assert.equal(redacted.value, "abcdef")
+})
+
+test("handles structured strings larger than the third-party default limit", () => {
+  const session = new PlaceholderSession({ secret: new Uint8Array(32).fill(6) })
+  const largeValue = `${"x".repeat(16 * 1024 * 1024)}sk-live-123`
+
+  const redacted = redactDeep({ value: largeValue }, patterns, session).value
+
+  assert.match(redacted.value, /__VG_TOKEN_[0-9a-f]{12}__$/)
+  assert.equal(redacted.value.length, largeValue.length - "sk-live-123".length + 25)
+})
+
+test("keeps redaction and restoration limited to arrays and plain objects", () => {
+  const session = new PlaceholderSession({ secret: new Uint8Array(32).fill(8) })
+  const original = new Map([["token", "sk-live-123"]])
+
+  const redacted = redactDeep(original, patterns, session).value
+
+  assert.equal(redacted, original)
+  assert.equal(redacted.get("token"), "sk-live-123")
+  restoreDeep(redacted, session)
+  assert.equal(redacted.get("token"), "sk-live-123")
+})
