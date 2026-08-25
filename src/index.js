@@ -142,3 +142,6 @@ export const VibeGuardPrivacy = async (ctx) => {
     },
   }
 }
+
+// OpenCode's plugin loader validates a `default` export on the entrypoint module.
+export default VibeGuardPrivacy
