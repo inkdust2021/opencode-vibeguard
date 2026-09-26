@@ -7,6 +7,8 @@
   "exports": "./src/index.js",
   "files": [
     "src",
+    "server.js",
+    "index.js",
     "README-zh.md",
     "vibeguard.config.json.example"
   ],

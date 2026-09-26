@@ -4,9 +4,10 @@ import { PlaceholderSession } from "./session.js"
 import { redactText } from "./engine.js"
 import { redactDeep, restoreDeep } from "./deep.js"
 import { restoreText } from "./restore.js"
+import { PLUGIN_ID, vibeguardSetup } from "./v2.js"
 
 /**
- * OpenCode 插件入口：
+ * OpenCode 插件入口（V1 + V2 双兼容）：
  * - `experimental.chat.messages.transform`：LLM 请求前对全部消息做脱敏（保证 provider 永远看不到真实值）
  * - `tool.execute.before`：工具执行前还原占位符（保证本机执行拿到真实值）
  *
@@ -142,3 +143,22 @@ export const VibeGuardPrivacy = async (ctx) => {
     },
   }
 }
+
+/**
+ * OpenCode V2 默认导出。
+ *
+ * OpenCode V2（>= 2.0.x）通过默认导出加载插件，要求它是 **对象** 且带
+ * `id` 与 `setup`（或 `effect`）。仅导出函数（无论命名还是默认）都会被拒绝：
+ *
+ *   SchemaError(Missing key at ["default"])   // 完全没有 default
+ *   SchemaError(Expected object at ["default"]) // default 是函数
+ *
+ * 这里导出 `{ id, setup }`，V2 走 `setup(ctx)`；V1 仍通过命名导出
+ * `VibeGuardPrivacy` 工作（V1 加载器读取模块的命名导出）。
+ */
+export { PLUGIN_ID, vibeguardSetup }
+export const vibeguardV2 = {
+  id: PLUGIN_ID,
+  setup: vibeguardSetup,
+}
+export default vibeguardV2
