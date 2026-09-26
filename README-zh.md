@@ -17,6 +17,8 @@
 - 在 **模型输出完成后**，把占位符自动还原为原文（本地显示/落库更自然）
 - 在 **工具执行前**（例如 `bash` / `write` / `edit`）把占位符还原为真实值（本机执行拿到明文）
 
+同时兼容 OpenCode **V1** 与 **V2**（见 [OpenCode V2 支持](#opencode-v2-支持)）。
+
 说明：OpenCode 的工具调用在数据库里会记录“真实执行的参数/输出”。本插件会在每次请求前，对 **历史消息中的工具输入/输出** 也做一次脱敏，避免明文被带给上游。
 
 占位符格式与 VibeGuard 保持一致：
@@ -28,7 +30,19 @@
 ## 安装/使用（本地开发）
 
 1. 把本插件目录放到你的项目里（例如 `./opencode-vibeguard/`）。
-2. 在你的 OpenCode 配置里加载插件：
+2. 在你的 OpenCode 配置里加载插件。
+
+OpenCode V2 解析 **本地目录** 时会读取 `<dir>/server`（或 `<dir>/index`），
+并忽略 `package.json` 的 `main`/`exports`，因此请把配置指向目录：
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["file://./opencode-vibeguard"]
+}
+```
+
+在 OpenCode V1 上可直接引用入口文件：
 
 ```jsonc
 {
@@ -77,6 +91,40 @@ npm i -D opencode-vibeguard
   "plugin": ["file://./node_modules/opencode-vibeguard/src/index.js"]
 }
 ```
+
+## OpenCode V2 支持
+
+OpenCode V2（>= 2.0.x）通过模块的 **默认导出** 加载插件，且要求它是一个带 `id`
+与 `setup`（或 `effect`）函数的对象。旧版本只导出了命名函数，因此 V2 每次启动都会
+拒绝加载：
+
+```
+PluginModule.LoadError: Plugin must export a default definition with an id and
+an effect or setup function. (cause: SchemaError(Missing key at ["default"]))
+```
+
+现在入口同时导出两者：
+
+```js
+// V2（默认导出——必须是对象；仅导出函数同样会被拒绝）
+export default { id: "opencode-vibeguard", setup }
+
+// V1（命名导出）
+export const VibeGuardPrivacy = async (ctx) => { ... }
+```
+
+V2 适配层（`src/v2.js`）把现有脱敏引擎接到 V2 的 hook 上：
+
+| 行为 | V1 hook | V2 hook |
+| --- | --- | --- |
+| 请求前脱敏 | `experimental.chat.messages.transform` | `session.hook("context")` |
+| 工具执行前还原 | `tool.execute.before` | `tool.hook("execute.before")` |
+
+### V2 已知差异
+
+V2 目前没有等价于 V1 `experimental.text.complete` 的钩子，因此“响应完成后还原展示文本”
+这一步在 V2 下不可用。密钥仍不会发往上游（请求前脱敏与工具执行前还原都正常），
+但模型自身回显的文本在界面与本地数据库中可能仍保留占位符。
 
 ## 配置文件
 
