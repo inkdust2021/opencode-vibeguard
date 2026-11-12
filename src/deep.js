@@ -1,3 +1,4 @@
+import { getPlaceholderRegex } from "./session.js"
 import { restoreText } from "./restore.js"
 import { redactText } from "./engine.js"
 
@@ -16,6 +17,25 @@ function isPlainObject(value) {
  * @param {{ prefix: string, lookup(ph: string): string | undefined }} session
  */
 export function restoreDeep(value, session) {
+  restoreDeepInPlace(value, session)
+  const left = []
+  const re = getPlaceholderRegex(session.prefix)
+  const scan = (node, seen = new WeakSet()) => {
+    if (typeof node === "string") return void left.push(...(node.match(re) ?? []))
+    if (!node || typeof node !== "object" || seen.has(node)) return
+    seen.add(node)
+    for (const v of Array.isArray(node) ? node : Object.values(node)) scan(v, seen)
+  }
+  scan(value)
+  if (left.length) {
+    throw new Error(
+      `[opencode-vibeguard] refusing to run the tool: ${[...new Set(left)].join(", ")} can't be restored ` +
+        "(no longer in this session's map), so the real value would be lost. Ask the user for it.",
+    )
+  }
+}
+
+function restoreDeepInPlace(value, session) {
   const seen = new WeakSet()
 
   const walk = (node) => {

@@ -65,7 +65,9 @@ export class PlaceholderSession {
   }
 
   lookup(placeholder) {
-    return this.forward.get(placeholder)
+    const original = this.forward.get(placeholder)
+    if (original !== undefined) this.created.set(placeholder, Date.now()) // in use: keep it alive
+    return original
   }
 
   lookupReverse(original) {
@@ -95,7 +97,10 @@ export class PlaceholderSession {
    */
   getOrCreatePlaceholder(original, category) {
     const existing = this.lookupReverse(original)
-    if (existing) return existing
+    if (existing) {
+      this.created.set(existing, Date.now()) // still seen in context: keep it alive
+      return existing
+    }
 
     const now = Date.now()
     this.cleanup(now)
